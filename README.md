@@ -41,27 +41,21 @@ A modern, AI-powered stock investment management dashboard built with React, Typ
 - **State Management**: React Hooks
 - **API Integration**: RESTful architecture ready
 
-## 📦 Free & Open Source APIs
+## 📦 Production APIs (Free Tier)
 
-This application is designed to work with free and open-source APIs:
+This application now uses production-ready APIs with free tiers:
 
-### Stock Data APIs (Choose one)
-- **Alpha Vantage** (Free tier: 5 API requests per minute, 100 per day)
-- **Finnhub** (Free tier: 60 API calls per minute)
-- **IEX Cloud** (Free tier: 500,000 messages per month)
-- **Yahoo Finance API** (Unofficial but free)
+### Current API Integration
+- **Alpha Vantage** - Real-time stock data (5 requests/minute, 500/day free)
+- **NewsAPI** - Stock news and sentiment (1,000 requests/month free)  
+- **Hugging Face** - AI sentiment analysis (generous free tier)
 
-### News APIs
-- **NewsAPI** (Free tier: 1,000 requests per day)
-- **Finnhub News** (Included with stock data)
-- **Alpha Vantage News** (Included with stock data)
-
-### AI APIs for Analysis (Choose one)
-- **Hugging Face Inference API** (Free tier available)
-- **OpenAI Compatible APIs**:
-  - **Together AI** (Free tier)
-  - **Groq** (Free tier)
-  - **Replicate** (Pay-per-use, generous free tier)
+### Features Now Live
+✅ Real-time stock prices and changes  
+✅ Actual news articles with AI sentiment analysis  
+✅ Technical analysis-based price forecasting  
+✅ News-driven buy/sell/hold recommendations  
+✅ Production error handling with fallbacks
 
 ## 🛠️ Installation & Setup
 
