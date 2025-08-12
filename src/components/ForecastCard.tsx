@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Clock, Brain } from "lucide-react";
+import { convertToEur, formatEurCurrency } from "@/services/stockApi";
 
 interface ForecastData {
   period: "1d" | "1w" | "1m";
@@ -17,6 +19,32 @@ interface ForecastCardProps {
 }
 
 export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCardProps) => {
+  const [eurCurrentPrice, setEurCurrentPrice] = useState<number | null>(null);
+  const [eurForecasts, setEurForecasts] = useState<Array<ForecastData & { eurPrediction: number }> | null>(null);
+
+  useEffect(() => {
+    const convertPrices = async () => {
+      try {
+        const [convertedCurrentPrice, ...convertedForecasts] = await Promise.all([
+          convertToEur(currentPrice),
+          ...forecasts.map(f => convertToEur(f.prediction))
+        ]);
+        
+        setEurCurrentPrice(convertedCurrentPrice);
+        setEurForecasts(forecasts.map((forecast, index) => ({
+          ...forecast,
+          eurPrediction: convertedForecasts[index]
+        })));
+      } catch (error) {
+        console.error("Error converting forecast to EUR:", error);
+        // Fallback to USD values
+        setEurCurrentPrice(currentPrice);
+        setEurForecasts(forecasts.map(f => ({ ...f, eurPrediction: f.prediction })));
+      }
+    };
+    
+    convertPrices();
+  }, [currentPrice, forecasts]);
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case "up":
@@ -43,9 +71,9 @@ export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCar
         </div>
 
         <div className="space-y-4">
-          {forecasts.map((forecast) => {
-            const change = forecast.prediction - currentPrice;
-            const changePercent = (change / currentPrice) * 100;
+          {eurForecasts?.map((forecast) => {
+            const change = forecast.eurPrediction - (eurCurrentPrice || 0);
+            const changePercent = (change / (eurCurrentPrice || 1)) * 100;
             
             return (
               <div
@@ -57,22 +85,26 @@ export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCar
                   <div>
                     <p className="text-sm font-medium text-foreground">{forecast.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      Confidence: <span className={getConfidenceColor(forecast.confidence)}>{forecast.confidence}%</span>
+                      Confidence: <span className={getConfidenceColor(forecast.confidence)}>{forecast.confidence.toFixed(0)}%</span>
                     </p>
                   </div>
                 </div>
                 
                 <div className="text-right">
                   <p className="text-sm font-semibold text-foreground">
-                    ${forecast.prediction.toFixed(2)}
+                    {formatEurCurrency(forecast.eurPrediction)}
                   </p>
                   <p className={`text-xs ${change >= 0 ? "text-success" : "text-danger"}`}>
-                    {change >= 0 ? "+" : ""}{change.toFixed(2)} ({changePercent.toFixed(1)}%)
+                    {change >= 0 ? "+" : ""}{formatEurCurrency(change)} ({changePercent.toFixed(1)}%)
                   </p>
                 </div>
               </div>
             );
-          })}
+          }) || (
+            <div className="text-center py-4 text-muted-foreground">
+              Loading forecasts...
+            </div>
+          )}
         </div>
 
         {aiInsight && (

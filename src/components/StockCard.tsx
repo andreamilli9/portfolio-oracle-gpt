@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus, X, MoreVertical } from "lucide-react";
+import { convertToEur, formatEurCurrency } from "@/services/stockApi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,28 @@ export const StockCard = ({
   onRemove,
 }: StockCardProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [eurPrice, setEurPrice] = useState<number | null>(null);
+  const [eurChange, setEurChange] = useState<number | null>(null);
+
+  useEffect(() => {
+    const convertPrices = async () => {
+      try {
+        const [convertedPrice, convertedChange] = await Promise.all([
+          convertToEur(price),
+          convertToEur(change)
+        ]);
+        setEurPrice(convertedPrice);
+        setEurChange(convertedChange);
+      } catch (error) {
+        console.error("Error converting to EUR:", error);
+        setEurPrice(price);
+        setEurChange(change);
+      }
+    };
+    
+    convertPrices();
+  }, [price, change]);
+
   const isPositive = change >= 0;
   const isNeutral = change === 0;
 
@@ -84,7 +107,7 @@ export const StockCard = ({
         {/* Price and Change */}
         <div className="space-y-2">
           <div className="text-2xl font-bold text-foreground">
-            ${price.toFixed(2)}
+            {eurPrice !== null ? formatEurCurrency(eurPrice) : "Loading..."}
           </div>
           
           <div className="flex items-center gap-2">
@@ -98,7 +121,12 @@ export const StockCard = ({
               }`}
             >
               <TrendIcon className="h-4 w-4" />
-              <span>{isPositive ? "+" : ""}{change.toFixed(2)}</span>
+              <span>
+                {eurChange !== null 
+                  ? `${isPositive ? "+" : ""}${formatEurCurrency(eurChange)}`
+                  : "Loading..."
+                }
+              </span>
               <span>({isPositive ? "+" : ""}{changePercent.toFixed(2)}%)</span>
             </div>
           </div>

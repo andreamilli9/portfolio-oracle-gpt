@@ -38,6 +38,57 @@ const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
 const NEWS_API_BASE = 'https://newsapi.org/v2';
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
 
+// Currency conversion - using ExchangeRate-API (free, no API key required)
+const EXCHANGE_RATE_API = 'https://api.exchangerate-api.com/v4/latest/USD';
+
+// Cache for exchange rate to avoid too many API calls
+let cachedExchangeRate: { rate: number; timestamp: number } | null = null;
+const CACHE_DURATION = 3600000; // 1 hour in milliseconds
+
+// Get USD to EUR exchange rate
+async function getUsdToEurRate(): Promise<number> {
+  try {
+    // Check cache first
+    if (cachedExchangeRate && (Date.now() - cachedExchangeRate.timestamp) < CACHE_DURATION) {
+      return cachedExchangeRate.rate;
+    }
+
+    const response = await fetch(EXCHANGE_RATE_API);
+    if (!response.ok) {
+      throw new Error('Failed to fetch exchange rate');
+    }
+    
+    const data = await response.json();
+    const eurRate = data.rates.EUR;
+    
+    // Cache the rate
+    cachedExchangeRate = {
+      rate: eurRate,
+      timestamp: Date.now()
+    };
+    
+    return eurRate;
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    // Fallback to approximate rate if API fails
+    return 0.85; // Approximate USD to EUR rate
+  }
+}
+
+// Convert USD to EUR
+export async function convertToEur(usdAmount: number): Promise<number> {
+  const rate = await getUsdToEurRate();
+  return usdAmount * rate;
+}
+
+// Format currency in EUR
+export function formatEurCurrency(amount: number): string {
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(amount);
+}
+
 // Helper function to analyze sentiment using Hugging Face
 async function analyzeSentiment(text: string): Promise<"positive" | "negative" | "neutral"> {
   if (!HF_API_KEY) return "neutral";

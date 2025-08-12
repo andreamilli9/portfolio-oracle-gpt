@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from "lucide-react";
+import { convertToEur, formatEurCurrency } from "@/services/stockApi";
 
 interface PortfolioData {
   totalValue: number;
@@ -13,16 +15,29 @@ interface PortfolioOverviewProps {
 }
 
 export const PortfolioOverview = ({ portfolio }: PortfolioOverviewProps) => {
+  const [eurTotalValue, setEurTotalValue] = useState<number | null>(null);
+  const [eurTotalChange, setEurTotalChange] = useState<number | null>(null);
+
+  useEffect(() => {
+    const convertValues = async () => {
+      try {
+        const [convertedValue, convertedChange] = await Promise.all([
+          convertToEur(portfolio.totalValue),
+          convertToEur(portfolio.totalChange)
+        ]);
+        setEurTotalValue(convertedValue);
+        setEurTotalChange(convertedChange);
+      } catch (error) {
+        console.error("Error converting portfolio to EUR:", error);
+        setEurTotalValue(portfolio.totalValue);
+        setEurTotalChange(portfolio.totalChange);
+      }
+    };
+    
+    convertValues();
+  }, [portfolio.totalValue, portfolio.totalChange]);
   const isPositive = portfolio.totalChange >= 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -36,7 +51,7 @@ export const PortfolioOverview = ({ portfolio }: PortfolioOverviewProps) => {
             <div>
               <p className="text-sm text-muted-foreground">Total Value</p>
               <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(portfolio.totalValue)}
+                {eurTotalValue !== null ? formatEurCurrency(eurTotalValue) : "Loading..."}
               </p>
             </div>
           </div>
@@ -54,7 +69,10 @@ export const PortfolioOverview = ({ portfolio }: PortfolioOverviewProps) => {
               <p className="text-sm text-muted-foreground">Today's Change</p>
               <div className="flex items-center gap-2">
                 <p className={`text-2xl font-bold ${isPositive ? 'text-success' : 'text-danger'}`}>
-                  {isPositive ? '+' : ''}{formatCurrency(portfolio.totalChange)}
+                  {eurTotalChange !== null 
+                    ? `${isPositive ? '+' : ''}${formatEurCurrency(eurTotalChange)}`
+                    : "Loading..."
+                  }
                 </p>
                 <span className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-danger'}`}>
                   ({isPositive ? '+' : ''}{portfolio.totalChangePercent.toFixed(2)}%)

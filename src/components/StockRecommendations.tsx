@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Plus, ExternalLink, Newspaper } from "lucide-react";
+import { convertToEur, formatEurCurrency } from "@/services/stockApi";
 
 interface StockRecommendation {
   symbol: string;
@@ -20,6 +22,45 @@ interface StockRecommendationsProps {
 }
 
 export const StockRecommendations = ({ recommendations, onAddStock }: StockRecommendationsProps) => {
+  const [eurRecommendations, setEurRecommendations] = useState<Array<any & { eurCurrentPrice: number; eurTargetPrice: number }> | null>(null);
+
+  useEffect(() => {
+    const convertRecommendations = async () => {
+      if (!recommendations || recommendations.length === 0) {
+        setEurRecommendations([]);
+        return;
+      }
+
+      try {
+        const convertedRecs = await Promise.all(
+          recommendations.map(async (rec) => {
+            const [eurCurrentPrice, eurTargetPrice] = await Promise.all([
+              convertToEur(rec.currentPrice),
+              convertToEur(rec.targetPrice)
+            ]);
+            
+            return {
+              ...rec,
+              eurCurrentPrice,
+              eurTargetPrice
+            };
+          })
+        );
+        
+        setEurRecommendations(convertedRecs);
+      } catch (error) {
+        console.error("Error converting recommendations to EUR:", error);
+        // Fallback to USD values
+        setEurRecommendations(recommendations.map(rec => ({
+          ...rec,
+          eurCurrentPrice: rec.currentPrice,
+          eurTargetPrice: rec.targetPrice
+        })));
+      }
+    };
+    
+    convertRecommendations();
+  }, [recommendations]);
   const getNewsImpactColor = (impact: string) => {
     switch (impact) {
       case "positive":
@@ -46,14 +87,18 @@ export const StockRecommendations = ({ recommendations, onAddStock }: StockRecom
         </div>
 
         <div className="space-y-4">
-          {recommendations.length === 0 ? (
+          {eurRecommendations === null ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading recommendations...
+            </div>
+          ) : eurRecommendations.length === 0 ? (
             <div className="text-center py-8">
               <Newspaper className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No recommendations available</p>
               <p className="text-sm text-muted-foreground mt-1">Check back later for AI-powered stock suggestions</p>
             </div>
           ) : (
-            recommendations.map((stock) => (
+            eurRecommendations.map((stock) => (
               <div
                 key={stock.symbol}
                 className="p-4 rounded-lg bg-secondary/20 border border-border/30 space-y-3"
@@ -63,7 +108,7 @@ export const StockRecommendations = ({ recommendations, onAddStock }: StockRecom
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-foreground">{stock.symbol}</h4>
                       <Badge variant={getConfidenceVariant(stock.confidence)} className="text-xs">
-                        {stock.confidence}% confidence
+                        {stock.confidence.toFixed(0)}% confidence
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{stock.name}</p>
@@ -82,11 +127,11 @@ export const StockRecommendations = ({ recommendations, onAddStock }: StockRecom
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Current Price</p>
-                    <p className="font-medium text-foreground">${stock.currentPrice.toFixed(2)}</p>
+                    <p className="font-medium text-foreground">{formatEurCurrency(stock.eurCurrentPrice)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Target Price</p>
-                    <p className="font-medium text-success">${stock.targetPrice.toFixed(2)}</p>
+                    <p className="font-medium text-success">{formatEurCurrency(stock.eurTargetPrice)}</p>
                   </div>
                 </div>
 
