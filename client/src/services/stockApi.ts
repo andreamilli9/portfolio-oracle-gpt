@@ -45,12 +45,12 @@ export interface ForecastData {
 
 // API Configuration - Finnhub provides much better free limits
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || 'demo';
-const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY || '';
+const NEWS_API_KEY = import.meta.env.VITE_NEWSDATA_API_KEY || '';
 const HF_API_KEY = import.meta.env.VITE_HUGGING_FACE_API_KEY || '';
 
-// Finnhub API endpoints
+// API endpoints
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
-const NEWS_API_BASE = 'https://newsapi.org/v2';
+const NEWSDATA_BASE = 'https://newsdata.io/api/1';
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
 
 // Storage for persistent stocks
@@ -449,12 +449,74 @@ export class StockApiService {
   }
 
   static async getStockNews(symbol: string): Promise<NewsItem[]> {
-    // Always return mock data for now since News API has strict limits and CORS issues
-    debugLog("info", `Using mock news data for ${symbol}`, { 
-      symbol, 
-      reason: "News API has strict rate limits and CORS restrictions" 
-    }, "NewsAPI");
-    
+    if (!NEWS_API_KEY) {
+      debugLog("warning", `No NewsData API key found, using mock data for ${symbol}`, { symbol }, "NewsAPI");
+      return this.getMockNews(symbol);
+    }
+
+    try {
+      debugLog("info", `Fetching real news for ${symbol} from NewsData.io`, { symbol }, "NewsAPI");
+      
+      // Get company name for better search results
+      const companyName = await this.getCompanyName(symbol);
+      const searchQuery = `"${symbol}" OR "${companyName}"`;
+      
+      const response = await fetch(
+        `${NEWSDATA_BASE}/news?apikey=${NEWS_API_KEY}&q=${encodeURIComponent(searchQuery)}&category=business,technology&language=en&size=10`
+      );
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          debugLog("warning", "NewsData API rate limit reached, using mock data", { symbol }, "NewsAPI");
+          return this.getMockNews(symbol);
+        }
+        throw new Error(`NewsData API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.results || data.results.length === 0) {
+        debugLog("info", `No news found for ${symbol}, using mock data`, { symbol }, "NewsAPI");
+        return this.getMockNews(symbol);
+      }
+
+      const newsItems: NewsItem[] = [];
+      
+      for (const article of data.results.slice(0, 5)) {
+        // Analyze sentiment of the title and description
+        const textToAnalyze = `${article.title} ${article.description || ''}`;
+        const sentiment = await analyzeSentiment(textToAnalyze);
+        
+        newsItems.push({
+          title: article.title || `${symbol} News Update`,
+          summary: article.description || article.content?.substring(0, 200) || 'No description available',
+          url: article.link || '#',
+          published: article.pubDate || new Date().toISOString(),
+          sentiment,
+          source: article.source_id || 'NewsData'
+        });
+      }
+
+      debugLog("info", `Fetched ${newsItems.length} real news articles for ${symbol}`, { 
+        symbol, 
+        count: newsItems.length,
+        sources: newsItems.map(n => n.source)
+      }, "NewsAPI");
+
+      return newsItems;
+      
+    } catch (error) {
+      debugLog("error", `Error fetching news for ${symbol}: ${error.message}`, { 
+        symbol, 
+        error: error.message 
+      }, "NewsAPI");
+      
+      // Fallback to mock data on error
+      return this.getMockNews(symbol);
+    }
+  }
+
+  private static getMockNews(symbol: string): NewsItem[] {
     // Generate varied mock news with realistic sentiments
     const mockNews = [
       {
@@ -483,7 +545,6 @@ export class StockApiService {
       }
     ];
 
-    // Add some randomization to make it feel more realistic
     return mockNews.slice(0, 2 + Math.floor(Math.random() * 2));
   }
 
