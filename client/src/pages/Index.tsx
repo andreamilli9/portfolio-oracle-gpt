@@ -10,22 +10,56 @@ import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
 import { DebugPanel, addLog } from "@/components/DebugPanel";
 
-// Mock storage functions (replace with actual implementation if needed)
-const getStoredStocks = (): string[] => {
-  const stocks = localStorage.getItem("stocks");
-  return stocks ? JSON.parse(stocks) : [];
-};
-
-const addStockToStorage = (symbol: string) => {
-  const storedSymbols = getStoredStocks();
-  if (!storedSymbols.includes(symbol)) {
-    localStorage.setItem("stocks", JSON.stringify([...storedSymbols, symbol]));
+// Database storage functions
+const getStoredStocks = async (): Promise<string[]> => {
+  try {
+    const response = await fetch('/api/stocks');
+    if (response.ok) {
+      const stocks = await response.json();
+      return stocks.map(stock => stock.symbol);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching stored stocks:', error);
+    return [];
   }
 };
 
-const removeStockFromStorage = (symbol: string) => {
-  const storedSymbols = getStoredStocks();
-  localStorage.setItem("stocks", JSON.stringify(storedSymbols.filter(s => s !== symbol)));
+const addStockToStorage = async (symbol: string, name: string) => {
+  try {
+    const response = await fetch('/api/stocks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ symbol: symbol.toUpperCase(), name }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to add stock to database');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding stock to database:', error);
+    throw error;
+  }
+};
+
+const removeStockFromStorage = async (symbol: string) => {
+  try {
+    const response = await fetch(`/api/stocks/${symbol}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to remove stock from database');
+    }
+  } catch (error) {
+    console.error('Error removing stock from database:', error);
+    throw error;
+  }
 };
 
 
@@ -53,33 +87,36 @@ const Index = () => {
 
   const loadStoredStocks = async () => {
     try {
-      const storedSymbols = getStoredStocks();
+      const storedSymbols = await getStoredStocks();
       if (storedSymbols.length > 0) {
         setLoading(true);
-        // In a real app, you'd fetch data for multiple symbols more efficiently
-        // For now, we'll fetch them one by one, similar to the original addStock logic
         const fetchedStocks: StockWithAnalysis[] = [];
+        
         for (const symbol of storedSymbols) {
           try {
             const stockData = await StockApiService.getStock(symbol);
-            // For simplicity, we're not fetching news, analysis, or forecast on load
-            // These would typically be fetched when a stock is selected or refreshed
-            fetchedStocks.push({ ...stockData, recommendation: undefined, forecast: undefined, aiInsight: undefined });
+            fetchedStocks.push({ 
+              ...stockData, 
+              recommendation: undefined, 
+              forecast: undefined, 
+              aiInsight: undefined 
+            });
           } catch (error) {
             console.error(`Error loading stock ${symbol}:`, error);
             addLog("error", `Failed to load stock ${symbol}`, { symbol, error: error.message }, "Portfolio");
-            // Optionally add a placeholder or skip if a stock fails to load
           }
         }
+        
         setStocks(fetchedStocks);
+        addLog("info", `Loaded ${fetchedStocks.length} stocks from database`, { count: fetchedStocks.length }, "Portfolio");
         toast({
-          title: "Stocks Loaded",
-          description: `${fetchedStocks.length} saved stocks loaded successfully`,
+          title: "Portfolio Loaded",
+          description: `${fetchedStocks.length} stocks loaded from database`,
         });
       }
     } catch (error) {
       console.error('Error loading stored stocks:', error);
-      addLog("error", "Failed to load stored stocks from storage", { error: error.message }, "Portfolio");
+      addLog("error", "Failed to load stocks from database", { error: error.message }, "Portfolio");
       toast({
         title: "Error Loading Stocks",
         description: "Failed to load your saved stocks",
@@ -129,12 +166,12 @@ const Index = () => {
       };
 
       setStocks(prev => [...prev, stockWithAnalysis]);
-      // Automatically store the stock for persistence
-      addStockToStorage(symbol.toUpperCase()); // Store uppercase symbol
+      // Store in database with company name
+      await addStockToStorage(stockData.symbol, stockData.name);
       addLog("info", `Successfully added ${symbol}`, { symbol, price: stockData.price }, "Portfolio");
       toast({
         title: "Stock added successfully",
-        description: `${stockData.symbol} has been added to your portfolio and saved`,
+        description: `${stockData.symbol} has been saved to your portfolio`,
       });
     } catch (error) {
       console.error("Error adding stock:", error);
@@ -152,18 +189,29 @@ const Index = () => {
     }
   };
 
-  const removeStock = (symbol: string) => {
+  const removeStock = async (symbol: string) => {
     setStocks(prev => prev.filter(stock => stock.symbol !== symbol));
-    // Remove from persistent storage
-    removeStockFromStorage(symbol);
-    addLog("info", `Removed stock ${symbol} from portfolio`, { symbol }, "Portfolio");
-    if (selectedStock?.symbol === symbol) {
-      setSelectedStock(null);
+    
+    try {
+      await removeStockFromStorage(symbol);
+      addLog("info", `Removed stock ${symbol} from database`, { symbol }, "Portfolio");
+      
+      if (selectedStock?.symbol === symbol) {
+        setSelectedStock(null);
+      }
+      
+      toast({
+        title: "Stock removed",
+        description: `${symbol} has been removed from your portfolio`,
+      });
+    } catch (error) {
+      addLog("error", `Failed to remove ${symbol} from database`, { symbol, error: error.message }, "Portfolio");
+      toast({
+        title: "Error removing stock",
+        description: `Failed to remove ${symbol} from database`,
+        variant: "destructive",
+      });
     }
-    toast({
-      title: "Stock removed",
-      description: `${symbol} has been removed from your portfolio and storage`,
-    });
   };
 
   const refreshData = async () => {

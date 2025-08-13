@@ -1,15 +1,53 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+
+import { Hono } from "hono";
 import { storage } from "./storage";
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+const app = new Hono();
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+// Stock endpoints
+app.get("/api/stocks", async (c) => {
+  try {
+    const stocks = await storage.getStocks();
+    return c.json(stocks);
+  } catch (error) {
+    return c.json({ error: "Failed to fetch stocks" }, 500);
+  }
+});
 
-  const httpServer = createServer(app);
+app.post("/api/stocks", async (c) => {
+  try {
+    const { symbol, name } = await c.req.json();
+    
+    if (!symbol || !name) {
+      return c.json({ error: "Symbol and name are required" }, 400);
+    }
 
-  return httpServer;
-}
+    // Check if stock already exists
+    const existing = await storage.getStock(symbol);
+    if (existing && existing.isActive) {
+      return c.json({ error: "Stock already exists" }, 409);
+    }
+
+    const stock = await storage.addStock({
+      symbol: symbol.toUpperCase(),
+      name,
+      userId: undefined // Single user for now
+    });
+
+    return c.json(stock);
+  } catch (error) {
+    return c.json({ error: "Failed to add stock" }, 500);
+  }
+});
+
+app.delete("/api/stocks/:symbol", async (c) => {
+  try {
+    const symbol = c.req.param("symbol");
+    await storage.removeStock(symbol);
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({ error: "Failed to remove stock" }, 500);
+  }
+});
+
+export default app;

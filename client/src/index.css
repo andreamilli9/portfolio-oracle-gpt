@@ -1,119 +1,83 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Financial Dashboard Design System - Dark theme with modern fintech aesthetics */
-
 @layer base {
   :root {
-    --background: 222 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* High-contrast colors for outdoor visibility */
+    --background: 255 255 255; /* Pure white background */
+    --foreground: 0 0 0; /* Pure black text */
 
-    --card: 225 25% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 248 250 252; /* Very light gray for cards */
+    --card-foreground: 15 23 42; /* Dark slate for card text */
 
-    --popover: 225 25% 8%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
 
-    --primary: 200 100% 50%;
-    --primary-foreground: 222 84% 4.9%;
-    --primary-glow: 200 100% 60%;
+    --primary: 29 78 216; /* Strong blue */
+    --primary-foreground: 255 255 255;
 
-    --secondary: 215 25% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 241 245 249; /* Light gray */
+    --secondary-foreground: 15 23 42;
 
-    --muted: 215 25% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 241 245 249;
+    --muted-foreground: 71 85 105;
 
-    --accent: 200 100% 50%;
-    --accent-foreground: 222 84% 4.9%;
+    --accent: 34 197 94; /* Strong green */
+    --accent-foreground: 255 255 255;
 
-    --success: 142 76% 36%;
-    --success-foreground: 355 100% 97%;
-    --success-glow: 142 76% 46%;
+    --destructive: 239 68 68; /* Strong red */
+    --destructive-foreground: 255 255 255;
 
-    --danger: 0 84.2% 60.2%;
-    --danger-foreground: 210 40% 98%;
-    --danger-glow: 0 84% 70%;
+    --border: 226 232 240; /* Light gray border */
+    --input: 248 250 252;
+    --ring: 29 78 216; /* Strong blue focus ring */
 
-    --warning: 48 96% 53%;
-    --warning-foreground: 222 84% 4.9%;
+    --radius: 0.75rem;
 
-    --border: 215 25% 15%;
-    --input: 215 25% 15%;
-    --ring: 200 100% 50%;
-
-    /* Financial gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(var(--success-glow)));
-    --gradient-danger: linear-gradient(135deg, hsl(var(--danger)), hsl(var(--danger-glow)));
-    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(215 25% 10%));
-
-    /* Shadows and effects */
-    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.3);
-    --shadow-success: 0 0 20px hsl(var(--success) / 0.3);
-    --shadow-danger: 0 0 20px hsl(var(--danger) / 0.3);
-    --shadow-card: 0 4px 12px hsl(222 84% 2% / 0.4);
-
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Enhanced financial colors */
+    --success: 22 163 74; /* Strong green for gains */
+    --danger: 220 38 38; /* Strong red for losses */
+    --warning: 245 158 11; /* Strong amber for warnings */
+    --info: 59 130 246; /* Strong blue for info */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* High contrast dark mode for better visibility */
+    --background: 15 23 42; /* Dark slate background */
+    --foreground: 248 250 252; /* Almost white text */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 30 41 59; /* Darker slate for cards */
+    --card-foreground: 248 250 252;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 30 41 59;
+    --popover-foreground: 248 250 252;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 99 102 241; /* Bright indigo */
+    --primary-foreground: 248 250 252;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 51 65 85; /* Medium slate */
+    --secondary-foreground: 248 250 252;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 51 65 85;
+    --muted-foreground: 148 163 184;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 34 197 94; /* Bright green */
+    --accent-foreground: 15 23 42;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 248 113 113; /* Bright red */
+    --destructive-foreground: 15 23 42;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 51 65 85;
+    --input: 30 41 59;
+    --ring: 99 102 241;
+
+    /* Enhanced dark mode financial colors */
+    --success: 34 197 94; /* Bright green */
+    --danger: 248 113 113; /* Bright red */
+    --warning: 251 191 36; /* Bright yellow */
+    --info: 96 165 250; /* Bright blue */
   }
 }
 
@@ -121,8 +85,96 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Enhanced text rendering for better mobile readability */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* High contrast button styles */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground font-semibold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn-success {
+    @apply bg-green-600 text-white font-semibold;
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 text-white font-semibold;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  }
+}
+
+/* Enhanced gradients with higher contrast */
+@layer components {
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, rgb(29 78 216) 0%, rgb(59 130 246) 100%);
+  }
+
+  .bg-gradient-success {
+    background: linear-gradient(135deg, rgb(22 163 74) 0%, rgb(34 197 94) 100%);
+  }
+
+  .bg-gradient-danger {
+    background: linear-gradient(135deg, rgb(220 38 38) 0%, rgb(239 68 68) 100%);
+  }
+
+  .bg-gradient-card {
+    background: linear-gradient(135deg, rgb(248 250 252) 0%, rgb(241 245 249) 100%);
+    border: 2px solid rgb(226 232 240);
+  }
+
+  .dark .bg-gradient-card {
+    background: linear-gradient(135deg, rgb(30 41 59) 0%, rgb(51 65 85) 100%);
+    border: 2px solid rgb(71 85 105);
+  }
+
+  .shadow-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+  }
+
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(29, 78, 216, 0.4);
+  }
+
+  .shadow-success {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  }
+
+  /* Enhanced animations */
+  .animate-slide-in {
+    animation: slideIn 0.5s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Mobile-optimized text sizes */
+  @media (max-width: 768px) {
+    .text-mobile-lg {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+      font-weight: 600;
+    }
+    
+    .text-mobile-base {
+      font-size: 1.125rem;
+      line-height: 1.625rem;
+      font-weight: 500;
+    }
   }
 }

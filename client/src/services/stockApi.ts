@@ -43,15 +43,17 @@ export interface ForecastData {
   trend: "up" | "down" | "neutral";
 }
 
-// API Configuration - Finnhub provides much better free limits
+// API Configuration - Multiple free APIs for better coverage
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || 'demo';
 const NEWS_API_KEY = import.meta.env.VITE_NEWSDATA_API_KEY || '';
 const HF_API_KEY = import.meta.env.VITE_HUGGING_FACE_API_KEY || '';
+const FMP_API_KEY = import.meta.env.VITE_FMP_API_KEY || 'demo';
 
 // API endpoints
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const NEWSDATA_BASE = 'https://newsdata.io/api/1';
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
+const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
 
 // Storage for persistent stocks
 const STORAGE_KEY = 'user_stocks';
@@ -281,62 +283,85 @@ export function createStockError(error: any, context: string): StockError {
   };
 }
 
-// Enhanced search stocks by company name or symbol with fuzzy matching
+// Enhanced search stocks using FMP API for real-time symbol search
 export async function searchStocks(query: string): Promise<{ symbol: string; companyName: string; match: string }[]> {
   const normalizedQuery = query.toLowerCase().trim();
   
-  // Direct symbol match
+  // Direct symbol match (still check this first)
   if (/^[A-Z]{1,5}$/.test(query.toUpperCase())) {
+    try {
+      // Validate symbol exists via profile check
+      const response = await fetch(`${FMP_BASE}/profile/${query.toUpperCase()}?apikey=${FMP_API_KEY}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.length > 0 && data[0].companyName) {
+          return [{ 
+            symbol: query.toUpperCase(), 
+            companyName: data[0].companyName,
+            match: 'symbol' 
+          }];
+        }
+      }
+    } catch (error) {
+      debugLog("warning", `Failed to validate symbol ${query}: ${error.message}`, { query }, "SymbolSearch");
+    }
+    
     return [{ symbol: query.toUpperCase(), companyName: query.toUpperCase(), match: 'symbol' }];
   }
   
-  // Company name search with fuzzy matching
-  const matches: { symbol: string; companyName: string; match: string }[] = [];
-  
-  for (const [company, symbols] of Object.entries(COMPANY_SEARCH_MAP)) {
-    // Exact match
-    if (company === normalizedQuery) {
-      symbols.forEach(symbol => {
-        matches.push({ symbol, companyName: company, match: 'exact' });
-      });
-    }
-    // Partial match (company contains query or query contains company)
-    else if (company.includes(normalizedQuery) || normalizedQuery.includes(company)) {
-      symbols.forEach(symbol => {
-        matches.push({ symbol, companyName: company, match: 'partial' });
-      });
-    }
-    // Fuzzy match (individual words)
-    else {
-      const companyWords = company.split(' ');
-      const queryWords = normalizedQuery.split(' ');
+  try {
+    debugLog("info", `Searching companies for query: ${query}`, { query }, "SymbolSearch");
+    
+    // Use FMP search API for company name search
+    const response = await fetch(
+      `${FMP_BASE}/search?query=${encodeURIComponent(query)}&limit=10&apikey=${FMP_API_KEY}`
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
       
-      let wordMatches = 0;
-      for (const queryWord of queryWords) {
-        if (companyWords.some(companyWord => 
-          companyWord.includes(queryWord) || queryWord.includes(companyWord)
-        )) {
-          wordMatches++;
+      if (data && data.length > 0) {
+        const results = data
+          .filter(item => item.symbol && item.name && item.exchangeShortName === 'NASDAQ' || item.exchangeShortName === 'NYSE')
+          .slice(0, 8) // Limit results
+          .map(item => ({
+            symbol: item.symbol,
+            companyName: item.name,
+            match: item.name.toLowerCase().includes(normalizedQuery) ? 'exact' : 'partial'
+          }));
+        
+        if (results.length > 0) {
+          debugLog("info", `Found ${results.length} companies via FMP API`, { query, count: results.length }, "SymbolSearch");
+          return results;
         }
       }
-      
-      if (wordMatches > 0 && wordMatches >= Math.min(queryWords.length * 0.6, companyWords.length * 0.5)) {
-        symbols.forEach(symbol => {
-          matches.push({ symbol, companyName: company, match: 'fuzzy' });
+    }
+  } catch (error) {
+    debugLog("error", `FMP search failed: ${error.message}`, { query, error: error.message }, "SymbolSearch");
+  }
+  
+  // Fallback to hardcoded mapping for popular stocks when API fails
+  const fallbackMatches: { symbol: string; companyName: string; match: string }[] = [];
+  
+  for (const [company, symbols] of Object.entries(COMPANY_SEARCH_MAP)) {
+    if (company.includes(normalizedQuery) || normalizedQuery.includes(company)) {
+      symbols.forEach(symbol => {
+        fallbackMatches.push({ 
+          symbol, 
+          companyName: company,
+          match: company === normalizedQuery ? 'exact' : 'partial'
         });
-      }
+      });
     }
   }
   
-  // Sort by match quality (exact > partial > fuzzy) and remove duplicates
-  const uniqueMatches = Array.from(
-    new Map(matches.map(m => [m.symbol, m])).values()
-  ).sort((a, b) => {
-    const order = { 'exact': 0, 'partial': 1, 'fuzzy': 2 };
-    return order[a.match] - order[b.match];
-  });
+  if (fallbackMatches.length > 0) {
+    debugLog("info", `Using fallback search, found ${fallbackMatches.length} matches`, { query, count: fallbackMatches.length }, "SymbolSearch");
+    return fallbackMatches.slice(0, 5);
+  }
   
-  return uniqueMatches.length > 0 ? uniqueMatches : [{ 
+  // Final fallback
+  return [{ 
     symbol: query.toUpperCase(), 
     companyName: 'Unknown Company', 
     match: 'fallback' 
