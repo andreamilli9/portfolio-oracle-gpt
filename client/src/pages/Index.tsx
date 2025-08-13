@@ -8,7 +8,7 @@ import { PortfolioOverview } from "@/components/PortfolioOverview";
 import { StockApiService, StockData, ForecastData, StockError, createStockError } from "@/services/stockApi";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
-import { DebugPanel, addLog, setDebugLogger } from "@/components/DebugPanel"; // Assuming DebugPanel and logging utilities are here
+import { DebugPanel, addLog } from "@/components/DebugPanel";
 
 interface StockWithAnalysis extends StockData {
   recommendation?: "BUY" | "SELL" | "HOLD";
