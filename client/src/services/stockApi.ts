@@ -204,6 +204,7 @@ const COMPANY_SEARCH_MAP: Record<string, string[]> = {
   'generali': ['ARZGY'],
   'enel': ['ENLAY'],
   'leonardo': ['FINMY'],
+  'ldo': ['FINMY'], // Leonardo S.p.A. (formerly Leonardo-Finmeccanica)
   'luxottica': ['EXX'], // Now part of EssilorLuxottica
   
   // Asian Companies
