@@ -10,6 +10,7 @@ interface ForecastData {
   prediction: number;
   confidence: number;
   trend: "up" | "down" | "neutral";
+  reasoning?: string;
 }
 
 interface ForecastCardProps {
@@ -82,11 +83,16 @@ export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCar
               >
                 <div className="flex items-center gap-3">
                   {getTrendIcon(forecast.trend)}
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{forecast.label}</p>
                     <p className="text-xs text-muted-foreground">
                       Confidence: <span className={getConfidenceColor(forecast.confidence)}>{forecast.confidence.toFixed(0)}%</span>
                     </p>
+                    {forecast.reasoning && (
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {forecast.reasoning}
+                      </p>
+                    )}
                   </div>
                 </div>
                 

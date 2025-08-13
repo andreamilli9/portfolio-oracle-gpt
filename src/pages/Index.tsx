@@ -20,6 +20,7 @@ const Index = () => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedStock, setSelectedStock] = useState<StockWithAnalysis | null>(null);
+  const [recommendationFilters, setRecommendationFilters] = useState<{ maxPrice?: number }>({});
   const { toast } = useToast();
 
   // Calculate portfolio totals
@@ -113,11 +114,31 @@ const Index = () => {
   };
 
   const loadRecommendations = async () => {
+    setLoading(true);
     try {
-      const recs = await StockApiService.getRecommendations();
+      // Convert maxPrice to USD if set (API expects USD)
+      let maxPriceUsd = recommendationFilters.maxPrice;
+      if (maxPriceUsd) {
+        // Rough conversion EUR to USD (should use actual exchange rate)
+        maxPriceUsd = maxPriceUsd / 0.85;
+      }
+      
+      const recs = await StockApiService.getRecommendations(maxPriceUsd);
       setRecommendations(recs);
+      
+      toast({
+        title: "Recommendations updated",
+        description: `Found ${recs.length} stocks matching your criteria`,
+      });
     } catch (error) {
       console.error("Error loading recommendations:", error);
+      toast({
+        title: "Failed to load recommendations",
+        description: "Check your connection and try again",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,6 +248,9 @@ const Index = () => {
               <StockRecommendations 
                 recommendations={recommendations}
                 onAddStock={addStock}
+                onFiltersChange={setRecommendationFilters}
+                onApplyFilters={loadRecommendations}
+                loading={loading}
               />
             </div>
           </div>

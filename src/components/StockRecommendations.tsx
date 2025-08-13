@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Plus, ExternalLink, Newspaper } from "lucide-react";
 import { convertToEur, formatEurCurrency } from "@/services/stockApi";
+import { RecommendationFilters } from "./RecommendationFilters";
 
 interface StockRecommendation {
   symbol: string;
@@ -18,10 +19,19 @@ interface StockRecommendation {
 
 interface StockRecommendationsProps {
   recommendations: StockRecommendation[];
-  onAddStock: (symbol: string) => void;
+  onAddStock: (symbol: string) => Promise<void>;
+  onFiltersChange: (filters: { maxPrice?: number }) => void;
+  onApplyFilters: () => void;
+  loading?: boolean;
 }
 
-export const StockRecommendations = ({ recommendations, onAddStock }: StockRecommendationsProps) => {
+export const StockRecommendations = ({ 
+  recommendations, 
+  onAddStock, 
+  onFiltersChange, 
+  onApplyFilters,
+  loading = false
+}: StockRecommendationsProps) => {
   const [eurRecommendations, setEurRecommendations] = useState<Array<any & { eurCurrentPrice: number; eurTargetPrice: number }> | null>(null);
 
   useEffect(() => {
@@ -79,12 +89,19 @@ export const StockRecommendations = ({ recommendations, onAddStock }: StockRecom
   };
 
   return (
-    <Card className="bg-gradient-card shadow-card border-border/50 animate-slide-in">
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-success" />
-          <h3 className="text-lg font-semibold text-foreground">AI Stock Recommendations</h3>
-        </div>
+    <div className="space-y-4">
+      <RecommendationFilters 
+        onFiltersChange={onFiltersChange}
+        onApplyFilters={onApplyFilters}
+        loading={loading}
+      />
+      
+      <Card className="bg-gradient-card shadow-card border-border/50 animate-slide-in">
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-success" />
+            <h3 className="text-lg font-semibold text-foreground">AI Stock Recommendations</h3>
+          </div>
 
         <div className="space-y-4">
           {eurRecommendations === null ? (
@@ -157,5 +174,6 @@ export const StockRecommendations = ({ recommendations, onAddStock }: StockRecom
         </div>
       </div>
     </Card>
+    </div>
   );
 };
