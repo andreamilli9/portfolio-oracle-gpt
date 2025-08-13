@@ -5,7 +5,7 @@ import { AddStockForm } from "@/components/AddStockForm";
 import { ForecastCard } from "@/components/ForecastCard";
 import { StockRecommendations } from "@/components/StockRecommendations";
 import { PortfolioOverview } from "@/components/PortfolioOverview";
-import { StockApiService, StockData, ForecastData, StockError, createStockError } from "@/services/stockApi";
+import { StockApiService, StockData, ForecastData, StockError, createStockError, setDebugLogger } from "@/services/stockApi";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
 import { DebugPanel, addLog } from "@/components/DebugPanel";
