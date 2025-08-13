@@ -8,6 +8,7 @@ import { PortfolioOverview } from "@/components/PortfolioOverview";
 import { StockApiService, StockData, ForecastData, StockError, createStockError } from "@/services/stockApi";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
+import { DebugPanel, addLog, setDebugLogger } from "@/components/DebugPanel"; // Assuming DebugPanel and logging utilities are here
 
 interface StockWithAnalysis extends StockData {
   recommendation?: "BUY" | "SELL" | "HOLD";
@@ -24,11 +25,17 @@ const Index = () => {
   const [recommendationFilters, setRecommendationFilters] = useState<{ maxPrice?: number }>({});
   const { toast } = useToast();
 
+  // Initialize debug logger
+  useEffect(() => {
+    setDebugLogger(addLog);
+    addLog("info", "Portfolio app initialized", { timestamp: new Date().toISOString() }, "App");
+  }, []);
+
   // Calculate portfolio totals
   const portfolioData = {
     totalValue: stocks.reduce((sum, stock) => sum + stock.price * 100, 0), // Assuming 100 shares each
     totalChange: stocks.reduce((sum, stock) => sum + stock.change * 100, 0),
-    totalChangePercent: stocks.length > 0 
+    totalChangePercent: stocks.length > 0
       ? (stocks.reduce((sum, stock) => sum + stock.changePercent, 0) / stocks.length)
       : 0,
     stockCount: stocks.length
@@ -37,9 +44,10 @@ const Index = () => {
   const addStock = async (symbol: string) => {
     try {
       setLoading(true);
-      
+
       // Check if stock already exists
       if (stocks.find(s => s.symbol === symbol)) {
+        addLog("warning", `Stock ${symbol} already in portfolio`, { symbol }, "Portfolio");
         toast({
           title: "Stock already added",
           description: `${symbol} is already in your portfolio`,
@@ -48,22 +56,36 @@ const Index = () => {
         return;
       }
 
+      addLog("info", `Adding stock ${symbol} to portfolio`, { symbol }, "Portfolio");
       const stockData = await StockApiService.getStock(symbol);
       const news = await StockApiService.getStockNews(symbol);
       const analysis = await StockApiService.analyzeStock(symbol, news);
       const forecast = await StockApiService.getForecast(symbol, stockData.price);
-      
+
       const stockWithAnalysis: StockWithAnalysis = {
         ...stockData,
         recommendation: analysis.recommendation,
         forecast,
         aiInsight: analysis.insight
       };
-      
+
       setStocks(prev => [...prev, stockWithAnalysis]);
+      addLog("info", `Successfully added ${symbol}`, { symbol, price: stockData.price }, "Portfolio");
+      toast({
+        title: "Stock added successfully",
+        description: `${stockData.symbol} has been added to your portfolio`,
+      });
     } catch (error) {
       console.error("Error adding stock:", error);
-      throw error;
+      const stockError = createStockError(error, 'adding stock');
+      setRecommendationError(stockError); // Re-using this state for general errors as well for now
+      addLog("error", `Failed to add stock ${symbol}`, { symbol, error: error.message }, "Portfolio");
+      toast({
+        title: stockError.message,
+        description: stockError.solution,
+        variant: "destructive",
+      });
+      throw error; // Re-throw to potentially be caught by higher level handlers if needed
     } finally {
       setLoading(false);
     }
@@ -71,6 +93,7 @@ const Index = () => {
 
   const removeStock = (symbol: string) => {
     setStocks(prev => prev.filter(stock => stock.symbol !== symbol));
+    addLog("info", `Removed stock ${symbol} from portfolio`, { symbol }, "Portfolio");
     if (selectedStock?.symbol === symbol) {
       setSelectedStock(null);
     }
@@ -82,8 +105,9 @@ const Index = () => {
 
   const refreshData = async () => {
     if (stocks.length === 0) return;
-    
+
     setLoading(true);
+    addLog("info", "Refreshing stock data", { count: stocks.length }, "Portfolio");
     try {
       const symbols = stocks.map(s => s.symbol);
       const updatedStocks = await Promise.all(
@@ -99,11 +123,14 @@ const Index = () => {
         })
       );
       setStocks(updatedStocks);
+      addLog("info", "Stock data refreshed successfully", null, "Portfolio");
       toast({
         title: "Data refreshed",
         description: "Stock prices have been updated",
       });
     } catch (error) {
+      console.error("Error refreshing data:", error);
+      addLog("error", "Failed to refresh stock data", { error: error.message }, "Portfolio");
       toast({
         title: "Refresh failed",
         description: "Unable to refresh stock data",
@@ -117,7 +144,8 @@ const Index = () => {
   const loadRecommendations = async () => {
     setLoading(true);
     setRecommendationError(null);
-    
+    addLog("info", "Loading stock recommendations", { filters: recommendationFilters }, "Recommendations");
+
     try {
       // Convert maxPrice to USD if set (API expects USD)
       let maxPriceUsd = recommendationFilters.maxPrice;
@@ -125,16 +153,18 @@ const Index = () => {
         // Rough conversion EUR to USD (should use actual exchange rate)
         maxPriceUsd = maxPriceUsd / 0.85;
       }
-      
+
       const recs = await StockApiService.getRecommendations(maxPriceUsd);
       setRecommendations(recs);
-      
+
       if (recs.length > 0) {
+        addLog("info", `Found ${recs.length} recommendations`, { count: recs.length }, "Recommendations");
         toast({
           title: "Recommendations updated",
           description: `Found ${recs.length} stocks matching your criteria`,
         });
       } else {
+        addLog("info", "No recommendations found", { filters: recommendationFilters }, "Recommendations");
         toast({
           title: "No recommendations found",
           description: "Try adjusting your filters or check back later",
@@ -145,7 +175,8 @@ const Index = () => {
       console.error("Error loading recommendations:", error);
       const stockError = createStockError(error, 'loading recommendations');
       setRecommendationError(stockError);
-      
+
+      addLog("error", `Failed to load recommendations`, { error: error.message }, "Recommendations");
       toast({
         title: stockError.message,
         description: stockError.solution,
@@ -175,10 +206,10 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">AI-Powered Investment Management</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={refreshData}
                 disabled={loading || stocks.length === 0}
                 className="border-border/50 hover:bg-accent/50"
@@ -186,7 +217,7 @@ const Index = () => {
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button 
+              <Button
                 onClick={loadRecommendations}
                 className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
               >
@@ -248,7 +279,7 @@ const Index = () => {
                 <h2 className="text-xl font-semibold text-foreground mb-4">
                   {selectedStock.symbol} Forecast
                 </h2>
-                <ForecastCard 
+                <ForecastCard
                   currentPrice={selectedStock.price}
                   forecasts={selectedStock.forecast}
                   aiInsight={selectedStock.aiInsight}
@@ -259,7 +290,7 @@ const Index = () => {
             {/* AI Recommendations */}
             <div>
               <h2 className="text-xl font-semibold text-foreground mb-4">AI Recommendations</h2>
-              <StockRecommendations 
+              <StockRecommendations
                 recommendations={recommendations}
                 onAddStock={addStock}
                 onFiltersChange={setRecommendationFilters}
@@ -272,6 +303,7 @@ const Index = () => {
           </div>
         </div>
       </main>
+      <DebugPanel />
     </div>
   );
 };

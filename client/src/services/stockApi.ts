@@ -1,6 +1,20 @@
 // Production stock data service using free APIs
 // APIs used: Alpha Vantage (stock data), NewsAPI (news), Hugging Face (AI sentiment)
 
+// Import debug logging
+let addLog: ((level: "error" | "info" | "warning", message: string, details?: any, component?: string) => void) | null = null;
+
+// Set the log function (will be called from components)
+export function setDebugLogger(logger: typeof addLog) {
+  addLog = logger;
+}
+
+function debugLog(level: "error" | "info" | "warning", message: string, details?: any, component?: string) {
+  if (addLog) {
+    addLog(level, message, details, component);
+  }
+}
+
 export interface StockData {
   symbol: string;
   name: string;
@@ -328,7 +342,7 @@ async function analyzeSentiment(text: string): Promise<"positive" | "negative" |
 export class StockApiService {
   static async getStock(symbol: string): Promise<StockData> {
     try {
-      console.log(`Fetching stock data for ${symbol} with API key: ${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...`);
+      debugLog("info", `Fetching stock data for ${symbol}`, { apiKey: `${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...` }, "StockAPI");
       
       // Alpha Vantage Global Quote API
       const response = await fetch(
@@ -336,28 +350,33 @@ export class StockApiService {
       );
       
       if (!response.ok) {
-        console.error(`API Response Error: ${response.status} ${response.statusText}`);
+        debugLog("error", `API Response Error: ${response.status} ${response.statusText}`, { symbol, status: response.status }, "StockAPI");
         throw new Error(`Failed to fetch stock data: ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log(`Raw API response for ${symbol}:`, data);
+      debugLog("info", `Raw API response for ${symbol}`, data, "StockAPI");
       
       // Check for API error messages
       if (data["Error Message"]) {
-        console.error(`Alpha Vantage API Error: ${data["Error Message"]}`);
+        debugLog("error", `Alpha Vantage API Error: ${data["Error Message"]}`, { symbol, error: data["Error Message"] }, "StockAPI");
         throw new Error(`API Error: ${data["Error Message"]}`);
       }
       
       if (data["Note"]) {
-        console.error(`Alpha Vantage API Rate Limit: ${data["Note"]}`);
+        debugLog("error", `Alpha Vantage API Rate Limit: ${data["Note"]}`, { symbol, note: data["Note"] }, "StockAPI");
         throw new Error(`Rate limit exceeded: ${data["Note"]}`);
+      }
+      
+      if (data["Information"]) {
+        debugLog("error", `Alpha Vantage API Information: ${data["Information"]}`, { symbol, info: data["Information"] }, "StockAPI");
+        throw new Error(`API Limit: ${data["Information"]}`);
       }
       
       const quote = data["Global Quote"];
       
       if (!quote || Object.keys(quote).length === 0) {
-        console.error(`No quote data found for ${symbol}. Full response:`, data);
+        debugLog("error", `No quote data found for ${symbol}`, { symbol, fullResponse: data }, "StockAPI");
         throw new Error(`Stock ${symbol} not found or no data available`);
       }
       
@@ -376,7 +395,7 @@ export class StockApiService {
         marketCap: undefined // Would need additional API call for market cap
       };
     } catch (error) {
-      console.error(`Error fetching stock ${symbol}:`, error);
+      debugLog("error", `Error fetching stock ${symbol}: ${error.message}`, { symbol, error: error.message }, "StockAPI");
       throw error;
     }
   }
@@ -445,8 +464,12 @@ export class StockApiService {
       
       return newsItems;
     } catch (error) {
-      console.error(`Error fetching news for ${symbol}:`, error);
-      console.error(`News API Key available: ${!!NEWS_API_KEY}, Length: ${NEWS_API_KEY.length}`);
+      debugLog("error", `Error fetching news for ${symbol}: ${error.message}`, { 
+        symbol, 
+        error: error.message,
+        apiKeyAvailable: !!NEWS_API_KEY,
+        apiKeyLength: NEWS_API_KEY.length 
+      }, "NewsAPI");
       return [
         {
           title: `${symbol} - Market Analysis`,
@@ -542,8 +565,12 @@ export class StockApiService {
         }
       ];
     } catch (error) {
-      console.error(`Error generating forecast for ${symbol}:`, error);
-      console.error(`Current price: ${currentPrice}, API Key: ${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...`);
+      debugLog("error", `Error generating forecast for ${symbol}: ${error.message}`, { 
+        symbol, 
+        currentPrice, 
+        error: error.message,
+        apiKey: `${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...`
+      }, "ForecastAPI");
       
       // Fallback to simple random forecast with reasoning
       const fallbackOneDayPrediction = currentPrice * (1 + (Math.random() - 0.5) * 0.03);
