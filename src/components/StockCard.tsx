@@ -105,9 +105,15 @@ export const StockCard = ({
         </div>
 
         {/* Price and Change */}
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {/* EUR Price (Primary) */}
           <div className="text-2xl font-bold text-foreground">
             {eurPrice !== null ? formatEurCurrency(eurPrice) : "Loading..."}
+          </div>
+          
+          {/* USD Price (Secondary) */}
+          <div className="text-lg text-muted-foreground">
+            ${price.toFixed(2)} USD
           </div>
           
           <div className="flex items-center gap-2">
@@ -121,13 +127,17 @@ export const StockCard = ({
               }`}
             >
               <TrendIcon className="h-4 w-4" />
-              <span>
-                {eurChange !== null 
-                  ? `${isPositive ? "+" : ""}${formatEurCurrency(eurChange)}`
-                  : "Loading..."
-                }
-              </span>
-              <span>({isPositive ? "+" : ""}{changePercent.toFixed(2)}%)</span>
+              <div className="flex flex-col gap-1">
+                <span>
+                  {eurChange !== null 
+                    ? `${isPositive ? "+" : ""}${formatEurCurrency(eurChange)} EUR`
+                    : "Loading..."
+                  }
+                </span>
+                <span className="text-xs">
+                  ${isPositive ? "+" : ""}{change.toFixed(2)} USD ({isPositive ? "+" : ""}{changePercent.toFixed(2)}%)
+                </span>
+              </div>
             </div>
           </div>
         </div>

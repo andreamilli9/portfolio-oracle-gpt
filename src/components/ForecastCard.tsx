@@ -21,7 +21,7 @@ interface ForecastCardProps {
 
 export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCardProps) => {
   const [eurCurrentPrice, setEurCurrentPrice] = useState<number | null>(null);
-  const [eurForecasts, setEurForecasts] = useState<Array<ForecastData & { eurPrediction: number }> | null>(null);
+  const [eurForecasts, setEurForecasts] = useState<Array<ForecastData & { eurPrediction: number; usdPrediction: number }> | null>(null);
 
   useEffect(() => {
     const convertPrices = async () => {
@@ -34,13 +34,14 @@ export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCar
         setEurCurrentPrice(convertedCurrentPrice);
         setEurForecasts(forecasts.map((forecast, index) => ({
           ...forecast,
-          eurPrediction: convertedForecasts[index]
+          eurPrediction: convertedForecasts[index],
+          usdPrediction: forecast.prediction
         })));
       } catch (error) {
         console.error("Error converting forecast to EUR:", error);
         // Fallback to USD values
         setEurCurrentPrice(currentPrice);
-        setEurForecasts(forecasts.map(f => ({ ...f, eurPrediction: f.prediction })));
+        setEurForecasts(forecasts.map(f => ({ ...f, eurPrediction: f.prediction, usdPrediction: f.prediction })));
       }
     };
     
@@ -97,12 +98,17 @@ export const ForecastCard = ({ currentPrice, forecasts, aiInsight }: ForecastCar
                 </div>
                 
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-foreground">
-                    {formatEurCurrency(forecast.eurPrediction)}
-                  </p>
-                  <p className={`text-xs ${change >= 0 ? "text-success" : "text-danger"}`}>
-                    {change >= 0 ? "+" : ""}{formatEurCurrency(change)} ({changePercent.toFixed(1)}%)
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatEurCurrency(forecast.eurPrediction)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ${forecast.usdPrediction.toFixed(2)} USD
+                    </p>
+                    <p className={`text-xs ${change >= 0 ? "text-success" : "text-danger"}`}>
+                      {change >= 0 ? "+" : ""}{formatEurCurrency(change)} ({changePercent.toFixed(1)}%)
+                    </p>
+                  </div>
                 </div>
               </div>
             );

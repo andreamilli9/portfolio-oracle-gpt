@@ -89,8 +89,9 @@ export function formatEurCurrency(amount: number): string {
   }).format(amount);
 }
 
-// Company name search mapping - expanded for global markets
+// Company name search mapping - expanded for global markets including European and Italian stocks
 const COMPANY_SEARCH_MAP: Record<string, string[]> = {
+  // US Tech Giants
   'apple': ['AAPL'],
   'microsoft': ['MSFT'],
   'alphabet': ['GOOGL', 'GOOG'],
@@ -100,6 +101,10 @@ const COMPANY_SEARCH_MAP: Record<string, string[]> = {
   'nvidia': ['NVDA'],
   'meta': ['META'],
   'netflix': ['NFLX'],
+  'intel': ['INTC'],
+  'amd': ['AMD'],
+  
+  // US Traditional Companies
   'disney': ['DIS'],
   'coca cola': ['KO'],
   'pepsi': ['PEP'],
@@ -107,14 +112,64 @@ const COMPANY_SEARCH_MAP: Record<string, string[]> = {
   'johnson': ['JNJ'],
   'visa': ['V'],
   'mastercard': ['MA'],
-  'intel': ['INTC'],
-  'amd': ['AMD'],
   'ford': ['F'],
   'general motors': ['GM'],
   'boeing': ['BA'],
   'caterpillar': ['CAT'],
   'mcdonalds': ['MCD'],
-  'starbucks': ['SBUX']
+  'starbucks': ['SBUX'],
+  
+  // European Companies (listed on US exchanges as ADRs)
+  'nestle': ['NSRGY'],
+  'asml': ['ASML'],
+  'sap': ['SAP'],
+  'unilever': ['UL', 'UN'],
+  'shell': ['SHEL'],
+  'bp': ['BP'],
+  'total': ['TTE'],
+  'siemens': ['SIEGY'],
+  'volkswagen': ['VWAGY'],
+  'bmw': ['BMWYY'],
+  'mercedes': ['DDAIF'],
+  'bayer': ['BAYRY'],
+  'basf': ['BASFY'],
+  'airbus': ['EADSY'],
+  'nokia': ['NOK'],
+  'ericsson': ['ERIC'],
+  'spotify': ['SPOT'],
+  
+  // Italian Companies (ADRs and direct listings)
+  'ferrari': ['RACE'],
+  'stellantis': ['STLA'],
+  'fiat': ['STLA'], // Now part of Stellantis
+  'eni': ['E'],
+  'telecom italia': ['TIIAY'],
+  'unicredit': ['UNCFF'],
+  'intesa sanpaolo': ['ISNPY'],
+  'generali': ['ARZGY'],
+  'enel': ['ENLAY'],
+  'leonardo': ['FINMY'],
+  'luxottica': ['EXX'], // Now part of EssilorLuxottica
+  
+  // Asian Companies
+  'toyota': ['TM'],
+  'sony': ['SONY'],
+  'nintendo': ['NTDOY'],
+  'samsung': ['SSNLF'],
+  'tsmc': ['TSM'],
+  'alibaba': ['BABA'],
+  'tencent': ['TCEHY'],
+  'baidu': ['BIDU'],
+  
+  // Additional International
+  'shopify': ['SHOP'],
+  'uber': ['UBER'],
+  'zoom': ['ZM'],
+  'salesforce': ['CRM'],
+  'oracle': ['ORCL'],
+  'adobe': ['ADBE'],
+  'paypal': ['PYPL'],
+  'square': ['SQ']
 };
 
 // Enhanced error types for better user feedback
@@ -170,24 +225,66 @@ export function createStockError(error: any, context: string): StockError {
   };
 }
 
-// Search stocks by company name or symbol
-export async function searchStocks(query: string): Promise<string[]> {
+// Enhanced search stocks by company name or symbol with fuzzy matching
+export async function searchStocks(query: string): Promise<{ symbol: string; companyName: string; match: string }[]> {
   const normalizedQuery = query.toLowerCase().trim();
   
   // Direct symbol match
   if (/^[A-Z]{1,5}$/.test(query.toUpperCase())) {
-    return [query.toUpperCase()];
+    return [{ symbol: query.toUpperCase(), companyName: query.toUpperCase(), match: 'symbol' }];
   }
   
-  // Company name search
-  const matches: string[] = [];
+  // Company name search with fuzzy matching
+  const matches: { symbol: string; companyName: string; match: string }[] = [];
+  
   for (const [company, symbols] of Object.entries(COMPANY_SEARCH_MAP)) {
-    if (company.includes(normalizedQuery) || normalizedQuery.includes(company)) {
-      matches.push(...symbols);
+    // Exact match
+    if (company === normalizedQuery) {
+      symbols.forEach(symbol => {
+        matches.push({ symbol, companyName: company, match: 'exact' });
+      });
+    }
+    // Partial match (company contains query or query contains company)
+    else if (company.includes(normalizedQuery) || normalizedQuery.includes(company)) {
+      symbols.forEach(symbol => {
+        matches.push({ symbol, companyName: company, match: 'partial' });
+      });
+    }
+    // Fuzzy match (individual words)
+    else {
+      const companyWords = company.split(' ');
+      const queryWords = normalizedQuery.split(' ');
+      
+      let wordMatches = 0;
+      for (const queryWord of queryWords) {
+        if (companyWords.some(companyWord => 
+          companyWord.includes(queryWord) || queryWord.includes(companyWord)
+        )) {
+          wordMatches++;
+        }
+      }
+      
+      if (wordMatches > 0 && wordMatches >= Math.min(queryWords.length * 0.6, companyWords.length * 0.5)) {
+        symbols.forEach(symbol => {
+          matches.push({ symbol, companyName: company, match: 'fuzzy' });
+        });
+      }
     }
   }
   
-  return matches.length > 0 ? matches : [query.toUpperCase()];
+  // Sort by match quality (exact > partial > fuzzy) and remove duplicates
+  const uniqueMatches = Array.from(
+    new Map(matches.map(m => [m.symbol, m])).values()
+  ).sort((a, b) => {
+    const order = { 'exact': 0, 'partial': 1, 'fuzzy': 2 };
+    return order[a.match] - order[b.match];
+  });
+  
+  return uniqueMatches.length > 0 ? uniqueMatches : [{ 
+    symbol: query.toUpperCase(), 
+    companyName: 'Unknown Company', 
+    match: 'fallback' 
+  }];
 }
 
 // Helper function to analyze sentiment using Hugging Face

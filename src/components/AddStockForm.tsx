@@ -14,7 +14,7 @@ interface AddStockFormProps {
 export const AddStockForm = ({ onAddStock }: AddStockFormProps) => {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<{ symbol: string; companyName: string; match: string }[]>([]);
   const [currentError, setCurrentError] = useState<StockError | null>(null);
   const { toast } = useToast();
 
@@ -88,6 +88,11 @@ export const AddStockForm = ({ onAddStock }: AddStockFormProps) => {
     }
 
     await handleSearch();
+    
+    // Auto-add if single exact match
+    if (searchResults.length === 1 && searchResults[0].match === 'exact') {
+      await handleAddStock(searchResults[0].symbol);
+    }
   };
 
   return (
@@ -161,19 +166,35 @@ export const AddStockForm = ({ onAddStock }: AddStockFormProps) => {
         {/* Search Results */}
         {searchResults.length > 0 && (
           <div className="mt-4 space-y-2">
-            <Label className="text-sm font-medium text-foreground">Search Results</Label>
+            <Label className="text-sm font-medium text-foreground">
+              Search Results ({searchResults.length} found)
+            </Label>
             <div className="space-y-2">
-              {searchResults.map((symbol) => (
+              {searchResults.map((result) => (
                 <div 
-                  key={symbol}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border/30"
+                  key={result.symbol}
+                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/20 border border-border/30 hover:bg-secondary/30 transition-colors"
                 >
-                  <span className="font-medium text-foreground">{symbol}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{result.symbol}</span>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        result.match === 'exact' ? 'bg-success/20 text-success' :
+                        result.match === 'partial' ? 'bg-warning/20 text-warning' :
+                        'bg-muted/20 text-muted-foreground'
+                      }`}>
+                        {result.match === 'exact' ? 'Exact match' :
+                         result.match === 'partial' ? 'Partial match' :
+                         result.match === 'fuzzy' ? 'Similar' : 'Symbol'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground capitalize">{result.companyName}</p>
+                  </div>
                   <Button
                     size="sm"
-                    onClick={() => handleAddStock(symbol)}
+                    onClick={() => handleAddStock(result.symbol)}
                     disabled={isLoading}
-                    className="bg-gradient-success hover:shadow-success"
+                    className="bg-gradient-success hover:shadow-success shrink-0"
                   >
                     <Plus className="h-3 w-3 mr-1" />
                     Add
@@ -181,6 +202,13 @@ export const AddStockForm = ({ onAddStock }: AddStockFormProps) => {
                 </div>
               ))}
             </div>
+            
+            {/* Auto-add suggestion for single exact match */}
+            {searchResults.length === 1 && searchResults[0].match === 'exact' && (
+              <div className="text-xs text-muted-foreground italic">
+                💡 Pro tip: Single exact matches can be added directly by pressing Enter while searching
+              </div>
+            )}
           </div>
         )}
       </div>

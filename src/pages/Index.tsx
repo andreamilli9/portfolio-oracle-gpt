@@ -5,7 +5,7 @@ import { AddStockForm } from "@/components/AddStockForm";
 import { ForecastCard } from "@/components/ForecastCard";
 import { StockRecommendations } from "@/components/StockRecommendations";
 import { PortfolioOverview } from "@/components/PortfolioOverview";
-import { StockApiService, StockData, ForecastData } from "@/services/stockApi";
+import { StockApiService, StockData, ForecastData, StockError, createStockError } from "@/services/stockApi";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
 
@@ -19,6 +19,7 @@ const Index = () => {
   const [stocks, setStocks] = useState<StockWithAnalysis[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<StockError | null>(null);
   const [selectedStock, setSelectedStock] = useState<StockWithAnalysis | null>(null);
   const [recommendationFilters, setRecommendationFilters] = useState<{ maxPrice?: number }>({});
   const { toast } = useToast();
@@ -115,6 +116,8 @@ const Index = () => {
 
   const loadRecommendations = async () => {
     setLoading(true);
+    setRecommendationError(null);
+    
     try {
       // Convert maxPrice to USD if set (API expects USD)
       let maxPriceUsd = recommendationFilters.maxPrice;
@@ -126,15 +129,26 @@ const Index = () => {
       const recs = await StockApiService.getRecommendations(maxPriceUsd);
       setRecommendations(recs);
       
-      toast({
-        title: "Recommendations updated",
-        description: `Found ${recs.length} stocks matching your criteria`,
-      });
+      if (recs.length > 0) {
+        toast({
+          title: "Recommendations updated",
+          description: `Found ${recs.length} stocks matching your criteria`,
+        });
+      } else {
+        toast({
+          title: "No recommendations found",
+          description: "Try adjusting your filters or check back later",
+          variant: "default",
+        });
+      }
     } catch (error) {
       console.error("Error loading recommendations:", error);
+      const stockError = createStockError(error, 'loading recommendations');
+      setRecommendationError(stockError);
+      
       toast({
-        title: "Failed to load recommendations",
-        description: "Check your connection and try again",
+        title: stockError.message,
+        description: stockError.solution,
         variant: "destructive",
       });
     } finally {
@@ -251,6 +265,8 @@ const Index = () => {
                 onFiltersChange={setRecommendationFilters}
                 onApplyFilters={loadRecommendations}
                 loading={loading}
+                error={recommendationError}
+                onRetry={loadRecommendations}
               />
             </div>
           </div>
