@@ -1,5 +1,6 @@
+
 // Production stock data service using free APIs
-// APIs used: Alpha Vantage (stock data), NewsAPI (news), Hugging Face (AI sentiment)
+// APIs used: Finnhub (stock data), NewsAPI (news), Hugging Face (AI sentiment)
 
 // Import debug logging
 let addLog: ((level: "error" | "info" | "warning", message: string, details?: any, component?: string) => void) | null = null;
@@ -42,15 +43,55 @@ export interface ForecastData {
   trend: "up" | "down" | "neutral";
 }
 
-// API Configuration - Set these in your environment
-const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || 'demo';
+// API Configuration - Finnhub provides much better free limits
+const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || 'demo';
 const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY || '';
 const HF_API_KEY = import.meta.env.VITE_HUGGING_FACE_API_KEY || '';
 
-// Alpha Vantage API endpoints
-const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
+// Finnhub API endpoints
+const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const NEWS_API_BASE = 'https://newsapi.org/v2';
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
+
+// Storage for persistent stocks
+const STORAGE_KEY = 'user_stocks';
+
+// Get stored stocks from localStorage
+export function getStoredStocks(): string[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error reading stored stocks:', error);
+    return [];
+  }
+}
+
+// Add stock to storage
+export function addStockToStorage(symbol: string): void {
+  try {
+    const stored = getStoredStocks();
+    if (!stored.includes(symbol.toUpperCase())) {
+      stored.push(symbol.toUpperCase());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      debugLog("info", `Added ${symbol} to storage`, { totalStocks: stored.length }, "Storage");
+    }
+  } catch (error) {
+    console.error('Error storing stock:', error);
+  }
+}
+
+// Remove stock from storage
+export function removeStockFromStorage(symbol: string): void {
+  try {
+    const stored = getStoredStocks();
+    const filtered = stored.filter(s => s !== symbol.toUpperCase());
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    debugLog("info", `Removed ${symbol} from storage`, { totalStocks: filtered.length }, "Storage");
+  } catch (error) {
+    console.error('Error removing stock from storage:', error);
+  }
+}
 
 // Currency conversion - using ExchangeRate-API (free, no API key required)
 const EXCHANGE_RATE_API = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -342,11 +383,11 @@ async function analyzeSentiment(text: string): Promise<"positive" | "negative" |
 export class StockApiService {
   static async getStock(symbol: string): Promise<StockData> {
     try {
-      debugLog("info", `Fetching stock data for ${symbol}`, { apiKey: `${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...` }, "StockAPI");
+      debugLog("info", `Fetching stock data for ${symbol} using Finnhub`, { apiKey: `${FINNHUB_API_KEY.substring(0, 8)}...` }, "StockAPI");
       
-      // Alpha Vantage Global Quote API
+      // Finnhub Quote API - 60 calls per minute for free!
       const response = await fetch(
-        `${ALPHA_VANTAGE_BASE}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`
+        `${FINNHUB_BASE}/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
       );
       
       if (!response.ok) {
@@ -358,41 +399,44 @@ export class StockApiService {
       debugLog("info", `Raw API response for ${symbol}`, data, "StockAPI");
       
       // Check for API error messages
-      if (data["Error Message"]) {
-        debugLog("error", `Alpha Vantage API Error: ${data["Error Message"]}`, { symbol, error: data["Error Message"] }, "StockAPI");
-        throw new Error(`API Error: ${data["Error Message"]}`);
+      if (data.error) {
+        debugLog("error", `Finnhub API Error: ${data.error}`, { symbol, error: data.error }, "StockAPI");
+        throw new Error(`API Error: ${data.error}`);
       }
       
-      if (data["Note"]) {
-        debugLog("error", `Alpha Vantage API Rate Limit: ${data["Note"]}`, { symbol, note: data["Note"] }, "StockAPI");
-        throw new Error(`Rate limit exceeded: ${data["Note"]}`);
-      }
-      
-      if (data["Information"]) {
-        debugLog("error", `Alpha Vantage API Information: ${data["Information"]}`, { symbol, info: data["Information"] }, "StockAPI");
-        throw new Error(`API Limit: ${data["Information"]}`);
-      }
-      
-      const quote = data["Global Quote"];
-      
-      if (!quote || Object.keys(quote).length === 0) {
+      if (!data.c || data.c === 0) {
         debugLog("error", `No quote data found for ${symbol}`, { symbol, fullResponse: data }, "StockAPI");
         throw new Error(`Stock ${symbol} not found or no data available`);
       }
       
-      const price = parseFloat(quote["05. price"]);
-      const change = parseFloat(quote["09. change"]);
-      const changePercent = parseFloat(quote["10. change percent"].replace('%', ''));
-      const volume = parseInt(quote["06. volume"]);
+      const price = data.c; // Current price
+      const change = data.d; // Change
+      const changePercent = data.dp; // Change percent
+      
+      // Get company profile for name
+      let companyName = symbol;
+      try {
+        const profileResponse = await fetch(
+          `${FINNHUB_BASE}/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+        );
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          if (profileData.name) {
+            companyName = profileData.name;
+          }
+        }
+      } catch (error) {
+        // Ignore profile errors, use symbol as name
+      }
       
       return {
-        symbol: quote["01. symbol"],
-        name: symbol, // Alpha Vantage doesn't provide company name in this endpoint
+        symbol: symbol.toUpperCase(),
+        name: companyName,
         price,
         change,
         changePercent,
-        volume,
-        marketCap: undefined // Would need additional API call for market cap
+        volume: undefined, // Would need additional API call
+        marketCap: undefined // Would need additional API call
       };
     } catch (error) {
       debugLog("error", `Error fetching stock ${symbol}: ${error.message}`, { symbol, error: error.message }, "StockAPI");
@@ -401,15 +445,15 @@ export class StockApiService {
   }
 
   static async getMultipleStocks(symbols: string[]): Promise<StockData[]> {
-    // Alpha Vantage free tier has rate limits, so we'll call sequentially with delays
+    // Finnhub allows 60 calls per minute, so we can be more aggressive
     const results: StockData[] = [];
     
     for (const symbol of symbols) {
       try {
         const stock = await this.getStock(symbol);
         results.push(stock);
-        // Add delay to respect rate limits (5 API calls per minute)
-        await new Promise(resolve => setTimeout(resolve, 12000));
+        // Small delay to respect rate limits (60 calls per minute = 1 call per second)
+        await new Promise(resolve => setTimeout(resolve, 1100));
       } catch (error) {
         console.error(`Failed to fetch ${symbol}:`, error);
       }
@@ -504,9 +548,9 @@ export class StockApiService {
     // This is a simplified model - in production you'd use more sophisticated algorithms
     
     try {
-      // Get recent price data for trend analysis
+      // Get recent price data for trend analysis using Finnhub
       const response = await fetch(
-        `${ALPHA_VANTAGE_BASE}?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_API_KEY}`
+        `${FINNHUB_BASE}/stock/candle?symbol=${symbol}&resolution=D&from=${Math.floor(Date.now()/1000) - 86400*10}&to=${Math.floor(Date.now()/1000)}&token=${FINNHUB_API_KEY}`
       );
       
       let trend = "neutral";
@@ -514,14 +558,13 @@ export class StockApiService {
       
       if (response.ok) {
         const data = await response.json();
-        const timeSeries = data["Time Series (Daily)"];
         
-        if (timeSeries) {
-          const prices = Object.values(timeSeries).slice(0, 10).map((day: any) => parseFloat(day["4. close"]));
+        if (data.c && data.c.length > 0) {
+          const prices = data.c.slice(-10); // Last 10 days
           
           // Simple trend calculation
-          const recentAvg = prices.slice(0, 5).reduce((sum, price) => sum + price, 0) / 5;
-          const olderAvg = prices.slice(5, 10).reduce((sum, price) => sum + price, 0) / 5;
+          const recentAvg = prices.slice(-5).reduce((sum, price) => sum + price, 0) / 5;
+          const olderAvg = prices.slice(-10, -5).reduce((sum, price) => sum + price, 0) / 5;
           
           if (recentAvg > olderAvg * 1.02) trend = "up";
           else if (recentAvg < olderAvg * 0.98) trend = "down";
@@ -569,7 +612,7 @@ export class StockApiService {
         symbol, 
         currentPrice, 
         error: error.message,
-        apiKey: `${ALPHA_VANTAGE_API_KEY.substring(0, 8)}...`
+        apiKey: `${FINNHUB_API_KEY.substring(0, 8)}...`
       }, "ForecastAPI");
       
       // Fallback to simple random forecast with reasoning
@@ -641,8 +684,8 @@ export class StockApiService {
           }
         }
         
-        // Add delay between API calls
-        await new Promise(resolve => setTimeout(resolve, 12000));
+        // Shorter delay with Finnhub's better limits
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (error) {
         console.error(`Error getting recommendation for ${symbol}:`, error);
       }

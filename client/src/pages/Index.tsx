@@ -10,6 +10,25 @@ import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Sparkles, RefreshCw } from "lucide-react";
 import { DebugPanel, addLog } from "@/components/DebugPanel";
 
+// Mock storage functions (replace with actual implementation if needed)
+const getStoredStocks = (): string[] => {
+  const stocks = localStorage.getItem("stocks");
+  return stocks ? JSON.parse(stocks) : [];
+};
+
+const addStockToStorage = (symbol: string) => {
+  const storedSymbols = getStoredStocks();
+  if (!storedSymbols.includes(symbol)) {
+    localStorage.setItem("stocks", JSON.stringify([...storedSymbols, symbol]));
+  }
+};
+
+const removeStockFromStorage = (symbol: string) => {
+  const storedSymbols = getStoredStocks();
+  localStorage.setItem("stocks", JSON.stringify(storedSymbols.filter(s => s !== symbol)));
+};
+
+
 interface StockWithAnalysis extends StockData {
   recommendation?: "BUY" | "SELL" | "HOLD";
   forecast?: ForecastData[];
@@ -25,11 +44,51 @@ const Index = () => {
   const [recommendationFilters, setRecommendationFilters] = useState<{ maxPrice?: number }>({});
   const { toast } = useToast();
 
-  // Initialize debug logger
+  // Initialize debug logger and load stored stocks
   useEffect(() => {
     setDebugLogger(addLog);
-    addLog("info", "Portfolio app initialized", { timestamp: new Date().toISOString() }, "App");
+    // Load stored stocks on page load
+    loadStoredStocks();
   }, []);
+
+  const loadStoredStocks = async () => {
+    try {
+      const storedSymbols = getStoredStocks();
+      if (storedSymbols.length > 0) {
+        setLoading(true);
+        // In a real app, you'd fetch data for multiple symbols more efficiently
+        // For now, we'll fetch them one by one, similar to the original addStock logic
+        const fetchedStocks: StockWithAnalysis[] = [];
+        for (const symbol of storedSymbols) {
+          try {
+            const stockData = await StockApiService.getStock(symbol);
+            // For simplicity, we're not fetching news, analysis, or forecast on load
+            // These would typically be fetched when a stock is selected or refreshed
+            fetchedStocks.push({ ...stockData, recommendation: undefined, forecast: undefined, aiInsight: undefined });
+          } catch (error) {
+            console.error(`Error loading stock ${symbol}:`, error);
+            addLog("error", `Failed to load stock ${symbol}`, { symbol, error: error.message }, "Portfolio");
+            // Optionally add a placeholder or skip if a stock fails to load
+          }
+        }
+        setStocks(fetchedStocks);
+        toast({
+          title: "Stocks Loaded",
+          description: `${fetchedStocks.length} saved stocks loaded successfully`,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading stored stocks:', error);
+      addLog("error", "Failed to load stored stocks from storage", { error: error.message }, "Portfolio");
+      toast({
+        title: "Error Loading Stocks",
+        description: "Failed to load your saved stocks",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Calculate portfolio totals
   const portfolioData = {
@@ -46,7 +105,7 @@ const Index = () => {
       setLoading(true);
 
       // Check if stock already exists
-      if (stocks.find(s => s.symbol === symbol)) {
+      if (stocks.find(s => s.symbol === symbol.toUpperCase())) { // Case-insensitive check
         addLog("warning", `Stock ${symbol} already in portfolio`, { symbol }, "Portfolio");
         toast({
           title: "Stock already added",
@@ -70,10 +129,12 @@ const Index = () => {
       };
 
       setStocks(prev => [...prev, stockWithAnalysis]);
+      // Automatically store the stock for persistence
+      addStockToStorage(symbol.toUpperCase()); // Store uppercase symbol
       addLog("info", `Successfully added ${symbol}`, { symbol, price: stockData.price }, "Portfolio");
       toast({
         title: "Stock added successfully",
-        description: `${stockData.symbol} has been added to your portfolio`,
+        description: `${stockData.symbol} has been added to your portfolio and saved`,
       });
     } catch (error) {
       console.error("Error adding stock:", error);
@@ -93,13 +154,15 @@ const Index = () => {
 
   const removeStock = (symbol: string) => {
     setStocks(prev => prev.filter(stock => stock.symbol !== symbol));
+    // Remove from persistent storage
+    removeStockFromStorage(symbol);
     addLog("info", `Removed stock ${symbol} from portfolio`, { symbol }, "Portfolio");
     if (selectedStock?.symbol === symbol) {
       setSelectedStock(null);
     }
     toast({
       title: "Stock removed",
-      description: `${symbol} has been removed from your portfolio`,
+      description: `${symbol} has been removed from your portfolio and storage`,
     });
   };
 
